@@ -185,7 +185,10 @@
         const header = document.createElement('div');
         header.id = 'floating-textarea-header';
         header.innerHTML = `
-            <span>浮动文本域</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span>浮动文本域</span>
+                <span id="floating-status" style="font-size: 12px; color: #4CAF50; font-weight: normal; opacity: 0.8;"></span>
+            </div>
             <div class="buttons">
                 <button class="btn-minimize">−</button>
                 <button class="btn-close">×</button>
@@ -369,8 +372,27 @@
             if (saveTimer !== undefined) {
                 clearTimeout(saveTimer);
             }
+
+            const statusEl = document.getElementById('floating-status');
+            if (statusEl) statusEl.textContent = '保存中...';
+
             saveTimer = setTimeout(() => {
-                setPromt(textarea.value).catch(error => console.error(error));
+                setPromt(textarea.value).then(() => {
+                    if (statusEl) {
+                        const now = new Date();
+                        const timeStr = now.getHours().toString().padStart(2, '0') + ':' +
+                            now.getMinutes().toString().padStart(2, '0') + ':' +
+                            now.getSeconds().toString().padStart(2, '0');
+                        statusEl.textContent = `已保存 ${timeStr}`;
+                        statusEl.style.color = '#4CAF50';
+                    }
+                }).catch(error => {
+                    console.error(error);
+                    if (statusEl) {
+                        statusEl.textContent = '保存失败';
+                        statusEl.style.color = 'red';
+                    }
+                });
             }, AUTO_SAVE_DURATION);
         };
 
