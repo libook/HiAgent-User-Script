@@ -12,6 +12,8 @@
 (async () => {
     'use strict';
 
+    const AUTO_SAVE_DURATION = 1000;//1秒
+
     // https://hia.volcenginepaas.com/product/llm/personal/personal-xxxxxx/application/xxxxxxx/arrange?tabKey=arrange
     // /product/llm/personal/personal-xxxxxx/application/xxxxxxx/arrange
     const pathSplit = window.location.pathname.split('/');
@@ -114,7 +116,7 @@
         },
     };
 
-    const prompt = await fetch("https://hia.volcenginepaas.com/api/app?Action=GetAppConfig&Version=2023-08-01", {
+    const fetchAppConfig = async () => fetch("https://hia.volcenginepaas.com/api/app?Action=GetAppConfig&Version=2023-08-01", {
         "headers": {
             "accept": "application/json, text/plain, */*",
             "accept-language": "zh",
@@ -135,10 +137,44 @@
         "method": "POST",
         "mode": "cors",
         "credentials": "include"
-    }).then(res => res.json()).then(json => json.Result.AppConfigDraft.PrePrompt);
+    }).then(res => res.json()).then(json => json.Result);
+
+    const getPrompt = async () => fetchAppConfig().then(result => result.AppConfigDraft.PrePrompt);
+
+    const setPromt = async (prompt) => {
+        const AppConfigDraft = await fetchAppConfig().then(result => result.AppConfigDraft);
+        AppConfigDraft.PrePrompt = prompt;
+        const requestBody = {
+            "AppID": application,
+            AppConfigDraft,
+            "WorkspaceID": personal,
+        };
+        await fetch("https://hia.volcenginepaas.com/api/app?Action=SaveAppConfigDraft&Version=2023-08-01", {
+            "headers": {
+                "accept": "application/json, text/plain, */*",
+                "accept-language": "zh",
+                "content-type": "application/json",
+                "sec-ch-ua": "\"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"144\", \"Google Chrome\";v=\"144\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-fetch-dest": "empty",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "timeout": "300000",
+                "workspaceid": personal,
+                "x-csrf-token": docCookies.getItem('x-csrf-token'),
+                "x-top-region": "cn-north-1"
+            },
+            "referrer": window.location.pathname,
+            "body": JSON.stringify(requestBody),
+            "method": "POST",
+            "mode": "cors",
+            "credentials": "include"
+        });
+    };
 
     // 创建浮动文本域
-    function createFloatingTextarea() {
+    const createFloatingTextarea = async () => {
         // 容器元素
         const container = document.createElement('div');
         container.id = 'floating-textarea-container';
@@ -158,7 +194,7 @@
         const textarea = document.createElement('textarea');
         textarea.id = 'floating-textarea';
         textarea.placeholder = '在这里输入内容...';
-        textarea.value=prompt;
+        textarea.value = await getPrompt();
 
         // 调整大小手柄
         const resizeHandle = document.createElement('div');
@@ -179,7 +215,7 @@
 
         // 从localStorage恢复状态
         restoreState(container, textarea);
-    }
+    };
 
     // 应用CSS样式
     function applyStyles() {
@@ -317,6 +353,16 @@
         minimizeBtn.addEventListener('click', toggleMinimize);
         closeBtn.addEventListener('click', closeFloatingTextarea);
 
+        let saveTimer;
+        const saveContent = () => {
+            if (saveTimer !== undefined) {
+                clearTimeout(saveTimer);
+            }
+            saveTimer = setTimeout(() => {
+                setPromt(textarea.value).catch(error => console.error(error));
+            }, AUTO_SAVE_DURATION);
+        };
+
         // 保存文本内容
         textarea.addEventListener('input', saveContent);
 
@@ -399,14 +445,9 @@
 
         function closeFloatingTextarea() {
             container.style.display = 'none';
-            localStorage.removeItem('floatingTextareaContent');
             localStorage.removeItem('floatingTextareaPosition');
             localStorage.removeItem('floatingTextareaSize');
             localStorage.removeItem('floatingTextareaMinimized');
-        }
-
-        function saveContent() {
-            localStorage.setItem('floatingTextareaContent', textarea.value);
         }
 
         function savePosition() {
@@ -434,12 +475,6 @@
 
     // 恢复状态
     function restoreState(container, textarea) {
-        // 恢复内容
-        const savedContent = localStorage.getItem('floatingTextareaContent');
-        if (savedContent) {
-            textarea.value = savedContent;
-        }
-
         // 恢复位置
         const savedPosition = localStorage.getItem('floatingTextareaPosition');
         if (savedPosition) {
@@ -475,7 +510,7 @@
     }
 
     // 创建触发按钮
-    function createTriggerButton() {
+    const createTriggerButton = () => {
         const triggerBtn = document.createElement('button');
         triggerBtn.id = 'floating-textarea-trigger';
         triggerBtn.textContent = 'T';
@@ -498,17 +533,17 @@
             boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
         });
 
-        triggerBtn.addEventListener('click', () => {
+        triggerBtn.addEventListener('click', async () => {
             const existing = document.getElementById('floating-textarea-container');
             if (existing) {
                 existing.style.display = 'flex';
             } else {
-                createFloatingTextarea();
+                await createFloatingTextarea();
             }
         });
 
         document.body.appendChild(triggerBtn);
-    }
+    };
 
     // 初始化
     function init() {
@@ -522,4 +557,4 @@
 
     // 启动
     init();
-})().catch(error=>console.error(error));
+})().catch(error => console.error(error));
