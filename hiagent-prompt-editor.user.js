@@ -200,6 +200,10 @@
         textarea.id = 'floating-textarea';
         textarea.placeholder = '在这里输入内容...';
 
+        // 目录区域
+        const toc = document.createElement('div');
+        toc.id = 'floating-toc';
+
         try {
             const promptContent = await getPrompt();
             textarea.value = promptContent || '';
@@ -208,14 +212,19 @@
             textarea.value = '加载失败，请重试';
         }
 
+        // 内容包装器
+        const contentWrapper = document.createElement('div');
+        contentWrapper.id = 'floating-content-wrapper';
+        contentWrapper.appendChild(toc);
+        contentWrapper.appendChild(textarea);
+
         // 调整大小手柄
         const resizeHandle = document.createElement('div');
         resizeHandle.id = 'floating-resize-handle';
-        resizeHandle.innerHTML = '↘';
 
         // 组装
         container.appendChild(header);
-        container.appendChild(textarea);
+        container.appendChild(contentWrapper);
         container.appendChild(resizeHandle);
         document.body.appendChild(container);
 
@@ -223,7 +232,7 @@
         applyStyles();
 
         // 添加事件监听
-        setupEventListeners(container, header, textarea, resizeHandle);
+        setupEventListeners(container, header, textarea, resizeHandle, toc);
 
         // 从localStorage恢复状态
         restoreState(container, textarea);
@@ -242,8 +251,8 @@
                 position: fixed;
                 top: 100px;
                 right: 20px;
-                width: 300px;
-                height: 400px;
+                width: 600px;
+                height: 500px;
                 background: white;
                 border: 1px solid #ccc;
                 border-radius: 8px;
@@ -253,8 +262,8 @@
                 flex-direction: column;
                 overflow: hidden;
                 resize: none;
-                min-width: 200px;
-                min-height: 150px;
+                min-width: 300px;
+                min-height: 200px;
             }
             
             #floating-textarea-header {
@@ -269,6 +278,7 @@
                 font-weight: bold;
                 font-size: 14px;
                 color: #333;
+                flex-shrink: 0;
             }
             
             #floating-textarea-header .buttons {
@@ -294,17 +304,78 @@
                 background: #e0e0e0;
             }
             
+            #floating-content-wrapper {
+                display: flex;
+                flex: 1;
+                overflow: hidden;
+                position: relative;
+            }
+
+            #floating-toc {
+                width: 180px;
+                background: #f9f9f9;
+                border-right: 1px solid #ddd;
+                overflow-y: auto;
+                overflow-x: hidden;
+                font-size: 12px;
+                padding: 10px 0;
+                flex-shrink: 0;
+                height: 100%; /* Ensure it takes full height */
+                box-sizing: border-box; /* Include padding in height/width */
+                overscroll-behavior: contain; /* Prevent scroll chaining */
+            }
+
+            /* Custom scrollbar for TOC */
+            #floating-toc::-webkit-scrollbar {
+                width: 6px;
+            }
+            #floating-toc::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            #floating-toc::-webkit-scrollbar-thumb {
+                background: #ccc;
+                border-radius: 3px;
+            }
+            #floating-toc::-webkit-scrollbar-thumb:hover {
+                background: #bbb;
+            }
+
+            #floating-toc .toc-item {
+                cursor: pointer;
+                padding: 4px 10px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                color: #555;
+                transition: background 0.2s;
+                line-height: 1.4;
+            }
+
+            #floating-toc .toc-item:hover {
+                background: #e9ecef;
+                color: #000;
+            }
+
+            #floating-toc .toc-item.h1 { padding-left: 10px; font-weight: bold; color: #333; }
+            #floating-toc .toc-item.h2 { padding-left: 20px; }
+            #floating-toc .toc-item.h3 { padding-left: 30px; }
+            #floating-toc .toc-item.h4 { padding-left: 40px; }
+            #floating-toc .toc-item.h5 { padding-left: 50px; }
+            #floating-toc .toc-item.h6 { padding-left: 60px; }
+
             #floating-textarea {
                 flex: 1;
                 padding: 15px;
                 border: none;
                 resize: none;
                 outline: none;
-                font-family: Arial, sans-serif;
+                font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
                 font-size: 14px;
-                line-height: 1.5;
+                line-height: 1.6;
                 background: #fff;
                 box-sizing: border-box;
+                white-space: pre-wrap;
+                overflow-y: auto;
             }
             
             #floating-resize-handle {
@@ -313,16 +384,20 @@
                 right: 0;
                 width: 20px;
                 height: 20px;
-                background: #f0f0f0;
-                border-top-left-radius: 3px;
+                background: transparent;
                 cursor: nwse-resize;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 12px;
-                color: #666;
-                border-left: 1px solid #ddd;
-                border-top: 1px solid #ddd;
+                z-index: 10;
+            }
+
+            #floating-resize-handle::after {
+                content: '';
+                position: absolute;
+                bottom: 3px;
+                right: 3px;
+                width: 6px;
+                height: 6px;
+                border-right: 2px solid #ccc;
+                border-bottom: 2px solid #ccc;
             }
             
             #floating-textarea-container.minimized {
@@ -330,7 +405,7 @@
                 min-height: 44.571px !important;
             }
             
-            #floating-textarea-container.minimized #floating-textarea,
+            #floating-textarea-container.minimized #floating-content-wrapper,
             #floating-textarea-container.minimized #floating-resize-handle {
                 display: none;
             }
@@ -347,7 +422,7 @@
     }
 
     // 设置事件监听
-    function setupEventListeners(container, header, textarea, resizeHandle) {
+    function setupEventListeners(container, header, textarea, resizeHandle, toc) {
         let isDragging = false;
         let isResizing = false;
         let startX, startY;
@@ -396,11 +471,120 @@
             }, AUTO_SAVE_DURATION);
         };
 
+        const updateTOC = () => {
+            const text = textarea.value;
+            const savedScrollTop = toc.scrollTop; // Save scroll position
+            toc.innerHTML = '';
+
+            const lines = text.split('\n');
+            let currentIndex = 0;
+
+            lines.forEach((line, lineIndex) => {
+                const match = line.match(/^(#{1,6})\s+(.+)$/);
+                if (match) {
+                    const level = match[1].length;
+                    const title = match[2].trim();
+
+                    const item = document.createElement('div');
+                    item.className = `toc-item h${level}`;
+                    item.textContent = title;
+                    item.title = title;
+
+                    // 记录该标题在文本中的起始位置（大致位置）
+                    const targetIndex = currentIndex;
+
+                    item.addEventListener('click', () => {
+                        scrollToIndex(targetIndex);
+                    });
+
+                    toc.appendChild(item);
+                }
+                currentIndex += line.length + 1; // +1 for newline
+            });
+
+            toc.scrollTop = savedScrollTop; // Restore scroll position
+        };
+
+        const scrollToIndex = (index) => {
+            // 使用 Shadow DIV 模拟计算高度
+            let shadowDiv = document.getElementById('textarea-shadow-measure');
+            if (!shadowDiv) {
+                shadowDiv = document.createElement('div');
+                shadowDiv.id = 'textarea-shadow-measure';
+                document.body.appendChild(shadowDiv);
+            }
+
+            // 复制关键样式
+            const cs = window.getComputedStyle(textarea);
+            shadowDiv.style.width = cs.width;
+            shadowDiv.style.padding = cs.padding;
+            shadowDiv.style.border = cs.border;
+            shadowDiv.style.boxSizing = cs.boxSizing;
+            shadowDiv.style.font = cs.font;
+            shadowDiv.style.fontFamily = cs.fontFamily;
+            shadowDiv.style.fontSize = cs.fontSize;
+            shadowDiv.style.fontWeight = cs.fontWeight;
+            shadowDiv.style.letterSpacing = cs.letterSpacing;
+            shadowDiv.style.lineHeight = cs.lineHeight;
+            shadowDiv.style.whiteSpace = cs.whiteSpace;
+            shadowDiv.style.wordWrap = cs.wordWrap;
+            shadowDiv.style.wordBreak = cs.wordBreak;
+
+            // 隐藏
+            shadowDiv.style.position = 'absolute';
+            shadowDiv.style.top = '-9999px';
+            shadowDiv.style.visibility = 'hidden';
+
+            // Sync scrollbar state with textarea to match content wrapping width
+            const hasScrollbar = textarea.scrollHeight > textarea.clientHeight;
+            shadowDiv.style.overflowY = hasScrollbar ? 'scroll' : 'hidden';
+
+            shadowDiv.style.paddingBottom = '0px'; // Prevent overscroll by bottom padding
+            shadowDiv.style.minHeight = '0px';
+
+            // 设置内容直到目标位置
+            // 注意：textContent会忽略HTML解析，这很好。
+            // 但如果textarea里有特殊空白符，textContent可能处理不同。
+            // 最好用 substring
+            shadowDiv.textContent = textarea.value.substring(0, index);
+
+            // 调整滚动高度
+            const targetScrollTop = shadowDiv.scrollHeight;
+
+            // 可选：高亮或者聚焦
+            textarea.focus();
+            if (textarea.setSelectionRange) {
+                textarea.setSelectionRange(index, index);
+            }
+
+            // Moved after focus/selection to ensure browser default scroll-into-view behavior 
+            // doesn't override our precise calculation.
+            textarea.scrollTop = targetScrollTop;
+
+            // Double-check in next frame just in case browser layout trashing interfered
+            requestAnimationFrame(() => {
+                if (Math.abs(textarea.scrollTop - targetScrollTop) > 5) {
+                    textarea.scrollTop = targetScrollTop;
+                }
+            });
+        };
+
         // 保存文本内容
-        textarea.addEventListener('input', saveContent);
+        textarea.addEventListener('input', () => {
+            saveContent();
+            updateTOC(); // 实时更新目录
+        });
+
+        // 初始化目录
+        updateTOC();
 
         // 防止文本域内拖动触发窗口拖动
         textarea.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+
+        // 防止TOC内拖动触发窗口拖动
+        toc.addEventListener('mousedown', (e) => {
             e.stopPropagation();
         });
 
@@ -429,7 +613,10 @@
 
             container.style.left = (startLeft + dx) + 'px';
             container.style.top = (startTop + dy) + 'px';
-            container.style.right = 'auto';
+            container.style.right = 'auto'; // 清除 right 属性，避免造成定位冲突
+
+            // 更新 right 存储，虽然我们主要依赖 left/top，但savePosition如果只是存储style.right可能会有问题
+            // 我们的savePosition实现是存 style.left, style.top, style.right
         }
 
         function stopDrag() {
