@@ -353,8 +353,6 @@
 
         // 拖动功能
         header.addEventListener('mousedown', startDrag);
-        document.addEventListener('mousemove', doDrag);
-        document.addEventListener('mouseup', stopDrag);
 
         // 调整大小
         resizeHandle.addEventListener('mousedown', startResize);
@@ -395,6 +393,9 @@
             startTop = rect.top;
 
             container.classList.add('dragging');
+
+            document.addEventListener('mousemove', doDrag);
+            document.addEventListener('mouseup', stopDrag);
             e.preventDefault();
         }
 
@@ -412,6 +413,8 @@
         function stopDrag() {
             isDragging = false;
             container.classList.remove('dragging');
+            document.removeEventListener('mousemove', doDrag);
+            document.removeEventListener('mouseup', stopDrag);
             savePosition();
         }
 
@@ -457,7 +460,7 @@
         }
 
         function closeFloatingTextarea() {
-            container.style.display = 'none';
+            container.remove();
             localStorage.removeItem('floatingTextareaPosition');
             localStorage.removeItem('floatingTextareaSize');
             localStorage.removeItem('floatingTextareaMinimized');
