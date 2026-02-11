@@ -4,7 +4,7 @@
 // @version      2026-02-11
 // @description  try to take over the world!
 // @author       libook
-// @match        https://hia.volcenginepaas.com/product/llm/personal/personal-*/application/*/arrange*
+// @match        https://hia.volcenginepaas.com/product/llm/personal/personal-*/application*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=volcenginepaas.com
 // @grant        none
 // ==/UserScript==
