@@ -116,22 +116,24 @@
         },
     };
 
+    const generateHeader = () => ({
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "zh",
+        "content-type": "application/json",
+        "sec-ch-ua": "\"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"144\", \"Google Chrome\";v=\"144\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "timeout": "300000",
+        "workspaceid": personal,
+        "x-csrf-token": docCookies.getItem('x-csrf-token'),
+        "x-top-region": "cn-north-1"
+    });
+
     const fetchAppConfig = async () => fetch("https://hia.volcenginepaas.com/api/app?Action=GetAppConfig&Version=2023-08-01", {
-        "headers": {
-            "accept": "application/json, text/plain, */*",
-            "accept-language": "zh",
-            "content-type": "application/json",
-            "sec-ch-ua": "\"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"144\", \"Google Chrome\";v=\"144\"",
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": "\"Windows\"",
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-origin",
-            "timeout": "300000",
-            "workspaceid": personal,
-            "x-csrf-token": docCookies.getItem('x-csrf-token'),
-            "x-top-region": "cn-north-1"
-        },
+        "headers": generateHeader(),
         "referrer": window.location.pathname,
         "body": `{\"AppID\":\"${application}\",\"WorkspaceID\":\"${personal}\"}`,
         "method": "POST",
@@ -150,21 +152,7 @@
             "WorkspaceID": personal,
         };
         await fetch("https://hia.volcenginepaas.com/api/app?Action=SaveAppConfigDraft&Version=2023-08-01", {
-            "headers": {
-                "accept": "application/json, text/plain, */*",
-                "accept-language": "zh",
-                "content-type": "application/json",
-                "sec-ch-ua": "\"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"144\", \"Google Chrome\";v=\"144\"",
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": "\"Windows\"",
-                "sec-fetch-dest": "empty",
-                "sec-fetch-mode": "cors",
-                "sec-fetch-site": "same-origin",
-                "timeout": "300000",
-                "workspaceid": personal,
-                "x-csrf-token": docCookies.getItem('x-csrf-token'),
-                "x-top-region": "cn-north-1"
-            },
+            "headers": generateHeader(),
             "referrer": window.location.pathname,
             "body": JSON.stringify(requestBody),
             "method": "POST",
