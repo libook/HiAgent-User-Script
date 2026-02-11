@@ -14,11 +14,19 @@
 
     const AUTO_SAVE_DURATION = 1000;//1秒
 
-    // https://hia.volcenginepaas.com/product/llm/personal/personal-xxxxxx/application/xxxxxxx/arrange?tabKey=arrange
-    // /product/llm/personal/personal-xxxxxx/application/xxxxxxx/arrange
-    const pathSplit = window.location.pathname.split('/');
-    const personal = pathSplit[4];
-    const application = pathSplit[6];
+    let personal = '';
+    let application = '';
+
+    const updateContext = () => {
+        const pathSplit = window.location.pathname.split('/');
+        // /product/llm/personal/personal-xxxxxx/application/xxxxxxx/arrange
+        if (pathSplit.length >= 7 && pathSplit[3] === 'personal' && pathSplit[5] === 'application') {
+            personal = pathSplit[4];
+            application = pathSplit[6];
+            return true;
+        }
+        return false;
+    };
 
     /*\
     |*|
@@ -163,6 +171,12 @@
 
     // 创建浮动文本域
     const createFloatingTextarea = async () => {
+        // 先移除旧的
+        const existingContainer = document.getElementById('floating-textarea-container');
+        if (existingContainer) {
+            existingContainer.remove();
+        }
+
         // 容器元素
         const container = document.createElement('div');
         container.id = 'floating-textarea-container';
@@ -182,7 +196,14 @@
         const textarea = document.createElement('textarea');
         textarea.id = 'floating-textarea';
         textarea.placeholder = '在这里输入内容...';
-        textarea.value = await getPrompt();
+
+        try {
+            const promptContent = await getPrompt();
+            textarea.value = promptContent || '';
+        } catch (e) {
+            console.error('Failed to load prompt:', e);
+            textarea.value = '加载失败，请重试';
+        }
 
         // 调整大小手柄
         const resizeHandle = document.createElement('div');
@@ -203,10 +224,14 @@
 
         // 从localStorage恢复状态
         restoreState(container, textarea);
+
+        return container;
     };
 
     // 应用CSS样式
     function applyStyles() {
+        if (document.getElementById('floating-textarea-styles')) return;
+
         const style = document.createElement('style');
         style.id = 'floating-textarea-styles';
         style.textContent = `
@@ -499,6 +524,8 @@
 
     // 创建触发按钮
     const createTriggerButton = () => {
+        if (document.getElementById('floating-textarea-trigger')) return;
+
         const triggerBtn = document.createElement('button');
         triggerBtn.id = 'floating-textarea-trigger';
         triggerBtn.textContent = 'T';
@@ -524,7 +551,11 @@
         triggerBtn.addEventListener('click', async () => {
             const existing = document.getElementById('floating-textarea-container');
             if (existing) {
-                existing.style.display = 'flex';
+                if (existing.style.display === 'none') {
+                    existing.style.display = 'flex';
+                } else {
+                    existing.style.display = 'none';
+                }
             } else {
                 await createFloatingTextarea();
             }
@@ -533,16 +564,68 @@
         document.body.appendChild(triggerBtn);
     };
 
+    const cleanup = () => {
+        const textareaContainer = document.getElementById('floating-textarea-container');
+        if (textareaContainer) {
+            textareaContainer.remove();
+        }
+        const triggerBtn = document.getElementById('floating-textarea-trigger');
+        if (triggerBtn) {
+            triggerBtn.remove();
+        }
+    };
+
+    const checkUrlMatch = () => {
+        // @match https://hia.volcenginepaas.com/product/llm/personal/personal-*/application/*/arrange*
+        const pattern = /https:\/\/hia\.volcenginepaas\.com\/product\/llm\/personal\/personal-[^\/]+\/application\/[^\/]+\/arrange.*/;
+        return pattern.test(window.location.href);
+    };
+
+    const handleUrlChange = () => {
+        // 卸载文本域及其关联元素
+        cleanup();
+
+        // 判断是否是预期 @match 的 URL
+        if (checkUrlMatch()) {
+            if (updateContext()) {
+                // 如果是则重新显示触发按钮
+                createTriggerButton();
+            }
+        } else {
+            // 如果不是则隐藏触发按钮 (already handled by cleanup)
+        }
+    };
+
+    const monitorUrlChange = () => {
+        // Monkey patch state methods
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+
+        history.pushState = function (...args) {
+            originalPushState.apply(this, args);
+            // Wait strictly after pushState, but in same cycle usually. 
+            // In some frameworks rendering is async, but we just want to update triggers.
+            handleUrlChange();
+        };
+
+        history.replaceState = function (...args) {
+            originalReplaceState.apply(this, args);
+            handleUrlChange();
+        };
+
+        window.addEventListener('popstate', handleUrlChange);
+    };
+
     // 初始化
     function init() {
-        // 等待页面加载完成
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', createTriggerButton);
-        } else {
-            createTriggerButton();
-        }
+        monitorUrlChange();
+        handleUrlChange(); // Initial check
     }
 
     // 启动
-    init();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })().catch(error => console.error(error));
