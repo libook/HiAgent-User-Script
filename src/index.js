@@ -13,7 +13,7 @@ import autosave from './autosave.js';
 
     const checkUrlMatch = () => {
         // @match https://hia.volcenginepaas.com/product/llm/personal/personal-*/application/*/arrange*
-        const pattern = /https:\/\/hia\.volcenginepaas\.com\/product\/llm\/personal\/personal-[^\/]+\/application\/[^\/]+\/arrange.*/;
+        const pattern = /https:\/\/hia\.volcenginepaas\.com\/product\/llm\/personal\/personal-[^/]+\/application\/[^/]+\/arrange.*/;
         return pattern.test(window.location.href);
     };
 
@@ -50,10 +50,10 @@ import autosave from './autosave.js';
     };
 
     // 初始化
-    function init() {
+    const init = () => {
         monitorUrlChange();
         handleUrlChange(); // Initial check
-    }
+    };
 
     // 启动
     if (document.readyState === 'loading') {

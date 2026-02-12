@@ -239,4 +239,4 @@ export default () => {
         }
     `;
     document.head.appendChild(style);
-}
+};

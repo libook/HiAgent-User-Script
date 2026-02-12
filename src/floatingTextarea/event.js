@@ -1,8 +1,12 @@
 import autosave from "../autosave.js";
 import request from "../request.js";
 import dbAdapter from '../db.js';
+import floatingTextarea from "./index.js";
 
 const AUTO_SAVE_DURATION = 1000;//1秒
+const SCROLL_TOLERANCE = 5;
+const DEFAULT_WIDTH = 200;
+const DEFAULT_HEIGHT = 150;
 
 // 设置事件监听
 export default (container, header, textarea, resizeHandle, toc, timeline) => {
@@ -11,6 +15,116 @@ export default (container, header, textarea, resizeHandle, toc, timeline) => {
     let startX, startY;
     let startWidth, startHeight;
     let startLeft, startTop;
+
+    const startDrag = (e) => {
+        if (e.target.closest('button')) return; // 如果是按钮则不拖动
+
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = container.getBoundingClientRect();
+        startLeft = rect.left;
+        startTop = rect.top;
+
+        container.classList.add('dragging');
+
+        document.addEventListener('mousemove', doDrag);
+        document.addEventListener('mouseup', stopDrag);
+        e.preventDefault();
+    };
+
+    const doDrag = (e) => {
+        if (!isDragging) return;
+
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        container.style.left = `${startLeft + dx}px`;
+        container.style.top = `${startTop + dy}px`;
+        container.style.right = 'auto'; // 清除 right 属性，避免造成定位冲突
+
+        // 更新 right 存储，虽然我们主要依赖 left/top，但savePosition如果只是存储style.right可能会有问题
+        // 我们的savePosition实现是存 style.left, style.top, style.right
+    };
+
+    const stopDrag = () => {
+        isDragging = false;
+        container.classList.remove('dragging');
+        document.removeEventListener('mousemove', doDrag);
+        document.removeEventListener('mouseup', stopDrag);
+        savePosition();
+    };
+
+    const startResize = (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = container.offsetWidth;
+        startHeight = container.offsetHeight;
+
+        container.classList.add('resizing');
+
+        document.addEventListener('mousemove', doResize);
+        document.addEventListener('mouseup', stopResize);
+        e.preventDefault();
+    };
+
+    const doResize = (e) => {
+        if (!isResizing) return;
+
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        const newWidth = Math.max(DEFAULT_WIDTH, startWidth + dx);
+        const newHeight = Math.max(DEFAULT_HEIGHT, startHeight + dy);
+
+        container.style.width = `${newWidth}px`;
+        container.style.height = `${newHeight}px`;
+    };
+
+    const stopResize = () => {
+        isResizing = false;
+        container.classList.remove('resizing');
+        document.removeEventListener('mousemove', doResize);
+        document.removeEventListener('mouseup', stopResize);
+        saveSize();
+    };
+
+    const toggleMinimize = () => {
+        container.classList.toggle('minimized');
+        minimizeBtn.textContent = container.classList.contains('minimized') ? '+' : '−';
+        saveMinimizedState();
+    };
+
+    const closeFloatingTextarea = () => {
+        autosave.cleanup();
+        floatingTextarea.cleanup();
+        localStorage.removeItem('floatingTextareaPosition');
+        localStorage.removeItem('floatingTextareaSize');
+        localStorage.removeItem('floatingTextareaMinimized');
+    };
+
+    const savePosition = () => {
+        const pos = {
+            "left": container.style.left,
+            "right": container.style.right,
+            "top": container.style.top,
+        };
+        localStorage.setItem('floatingTextareaPosition', JSON.stringify(pos));
+    };
+
+    const saveSize = () => {
+        const size = {
+            "height": container.style.height,
+            "width": container.style.width,
+        };
+        localStorage.setItem('floatingTextareaSize', JSON.stringify(size));
+    };
+
+    const saveMinimizedState = () => {
+        localStorage.setItem('floatingTextareaMinimized',
+            container.classList.contains('minimized'));
+    };
 
     // 拖动功能
     header.addEventListener('mousedown', startDrag);
@@ -34,9 +148,7 @@ export default (container, header, textarea, resizeHandle, toc, timeline) => {
             await request.setPromt(content);
             if (statusEl) {
                 const now = new Date();
-                const timeStr = now.getHours().toString().padStart(2, '0') + ':' +
-                    now.getMinutes().toString().padStart(2, '0') + ':' +
-                    now.getSeconds().toString().padStart(2, '0');
+                const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`; // eslint-disable-line no-magic-numbers
                 statusEl.textContent = `已保存 ${timeStr}`;
                 statusEl.style.color = '#4CAF50';
                 if (typeof renderTimeline === 'function') renderTimeline();
@@ -71,7 +183,7 @@ export default (container, header, textarea, resizeHandle, toc, timeline) => {
         const lines = text.split('\n');
         let currentIndex = 0;
 
-        lines.forEach((line, lineIndex) => {
+        lines.forEach((line) => {
             const match = line.match(/^(#{1,6})\s+(.+)$/);
             if (match) {
                 const level = match[1].length;
@@ -155,7 +267,7 @@ export default (container, header, textarea, resizeHandle, toc, timeline) => {
 
         // Double-check in next frame just in case browser layout trashing interfered
         requestAnimationFrame(() => {
-            if (Math.abs(textarea.scrollTop - targetScrollTop) > 5) {
+            if (Math.abs(textarea.scrollTop - targetScrollTop) > SCROLL_TOLERANCE) {
                 textarea.scrollTop = targetScrollTop;
             }
         });
@@ -184,7 +296,7 @@ export default (container, header, textarea, resizeHandle, toc, timeline) => {
 
         records.forEach(record => {
             const date = new Date(record.timestamp);
-            const timeStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+            const timeStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`; // eslint-disable-line no-magic-numbers
 
             const point = document.createElement('div');
             point.className = 'timeline-point';
@@ -231,114 +343,4 @@ export default (container, header, textarea, resizeHandle, toc, timeline) => {
     timeline.addEventListener('mousedown', (e) => {
         e.stopPropagation();
     });
-
-    function startDrag(e) {
-        if (e.target.closest('button')) return; // 如果是按钮则不拖动
-
-        isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        const rect = container.getBoundingClientRect();
-        startLeft = rect.left;
-        startTop = rect.top;
-
-        container.classList.add('dragging');
-
-        document.addEventListener('mousemove', doDrag);
-        document.addEventListener('mouseup', stopDrag);
-        e.preventDefault();
-    }
-
-    function doDrag(e) {
-        if (!isDragging) return;
-
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-
-        container.style.left = (startLeft + dx) + 'px';
-        container.style.top = (startTop + dy) + 'px';
-        container.style.right = 'auto'; // 清除 right 属性，避免造成定位冲突
-
-        // 更新 right 存储，虽然我们主要依赖 left/top，但savePosition如果只是存储style.right可能会有问题
-        // 我们的savePosition实现是存 style.left, style.top, style.right
-    }
-
-    function stopDrag() {
-        isDragging = false;
-        container.classList.remove('dragging');
-        document.removeEventListener('mousemove', doDrag);
-        document.removeEventListener('mouseup', stopDrag);
-        savePosition();
-    }
-
-    function startResize(e) {
-        isResizing = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        startWidth = container.offsetWidth;
-        startHeight = container.offsetHeight;
-
-        container.classList.add('resizing');
-
-        document.addEventListener('mousemove', doResize);
-        document.addEventListener('mouseup', stopResize);
-        e.preventDefault();
-    }
-
-    function doResize(e) {
-        if (!isResizing) return;
-
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-
-        const newWidth = Math.max(200, startWidth + dx);
-        const newHeight = Math.max(150, startHeight + dy);
-
-        container.style.width = newWidth + 'px';
-        container.style.height = newHeight + 'px';
-    }
-
-    function stopResize() {
-        isResizing = false;
-        container.classList.remove('resizing');
-        document.removeEventListener('mousemove', doResize);
-        document.removeEventListener('mouseup', stopResize);
-        saveSize();
-    }
-
-    function toggleMinimize() {
-        container.classList.toggle('minimized');
-        minimizeBtn.textContent = container.classList.contains('minimized') ? '+' : '−';
-        saveMinimizedState();
-    }
-
-    function closeFloatingTextarea() {
-        autosave.cleanup();
-        container.remove();
-        localStorage.removeItem('floatingTextareaPosition');
-        localStorage.removeItem('floatingTextareaSize');
-        localStorage.removeItem('floatingTextareaMinimized');
-    }
-
-    function savePosition() {
-        const pos = {
-            left: container.style.left,
-            top: container.style.top,
-            right: container.style.right
-        };
-        localStorage.setItem('floatingTextareaPosition', JSON.stringify(pos));
-    }
-
-    function saveSize() {
-        const size = {
-            width: container.style.width,
-            height: container.style.height
-        };
-        localStorage.setItem('floatingTextareaSize', JSON.stringify(size));
-    }
-
-    function saveMinimizedState() {
-        localStorage.setItem('floatingTextareaMinimized',
-            container.classList.contains('minimized'));
-    }
-}
+};

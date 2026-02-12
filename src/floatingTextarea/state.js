@@ -1,6 +1,6 @@
 // 恢复状态
 export default {
-    "restore": (container, textarea) => {
+    "restore": (container) => {
         // 恢复位置
         const savedPosition = localStorage.getItem('floatingTextareaPosition');
         if (savedPosition) {
@@ -34,4 +34,4 @@ export default {
             if (minimizeBtn) minimizeBtn.textContent = '+';
         }
     },
-}
+};

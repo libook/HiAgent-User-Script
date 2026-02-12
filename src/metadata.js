@@ -1,17 +1,17 @@
 const splitUrl = () => {
     const pathSplit = window.location.pathname.split('/');
     // /product/llm/personal/personal-xxxxxx/application/xxxxxxx/arrange
-    if (pathSplit.length >= 7 && pathSplit[3] === 'personal' && pathSplit[5] === 'application') {
+    if (pathSplit.length >= 7 && pathSplit[3] === 'personal' && pathSplit[5] === 'application') { // eslint-disable-line no-magic-numbers
         return pathSplit;
     }
     return null;
 };
 
 export default {
-    get application() {
+    get "application"() {
         return splitUrl()[6];
     },
-    get personal() {
+    get "personal"() {
         return splitUrl()[4];
     },
 };

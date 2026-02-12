@@ -1,9 +1,10 @@
+/* eslint-disable sort-keys */
 import metadata from "./metadata.js";
 
 export default {
-    dbName: 'HiAgentPromptEditorDB',
-    storeName: 'snapshots',
-    maxRecords: 30, // Per application limits
+    "dbName": 'HiAgentPromptEditorDB',
+    "maxRecords": 30, // Per application limits
+    "storeName": 'snapshots',
 
     async getDB() {
         return new Promise((resolve, reject) => {
@@ -11,8 +12,8 @@ export default {
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains(this.storeName)) {
-                    const store = db.createObjectStore(this.storeName, { keyPath: 'id', autoIncrement: true });
-                    store.createIndex('timestamp', 'timestamp', { unique: false });
+                    const store = db.createObjectStore(this.storeName, { "keyPath": 'id', "autoIncrement": true });
+                    store.createIndex('timestamp', 'timestamp', { "unique": false });
                 }
             };
             request.onsuccess = (event) => resolve(event.target.result);
@@ -74,9 +75,9 @@ export default {
             const transaction = db.transaction([this.storeName], 'readwrite');
             const store = transaction.objectStore(this.storeName);
             const request = store.add({
-                application: metadata.application, // Isolate by application
-                content: content,
-                timestamp: new Date().getTime()
+                "application": metadata.application, // Isolate by application
+                "content": content,
+                "timestamp": new Date().getTime(),
             });
 
             request.onsuccess = () => resolve();
@@ -115,5 +116,5 @@ export default {
         } catch (error) {
             console.error('IndexedDB Save Error:', error);
         }
-    }
+    },
 };
