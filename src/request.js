@@ -27,6 +27,7 @@ const fetchAppConfig = async () => fetch("https://hia.volcenginepaas.com/api/app
 }).then(res => res.json()).then(json => json.Result);
 
 export default {
+    "getAppType": async () => fetchAppConfig().then(result => result.AppBaseInfo.AppType),
     "getPrompt": async () => fetchAppConfig().then(result => result.AppConfigDraft.PrePrompt),
     "setPromt": async (prompt) => {
         const AppConfigDraft = await fetchAppConfig().then(result => result.AppConfigDraft);

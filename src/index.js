@@ -1,6 +1,7 @@
 import floatingTextarea from './floatingTextarea/index.js';
 import triggerButton from './triggerButton.js';
 import autosave from './autosave.js';
+import request from './request.js';
 
 (async () => {
     'use strict';
@@ -17,13 +18,19 @@ import autosave from './autosave.js';
         return pattern.test(window.location.href);
     };
 
-    const handleUrlChange = () => {
+    const handleUrlChange = async () => {
         // 卸载文本域及其关联元素
         cleanup();
 
+        const doesUrlMatch = checkUrlMatch();
+
+
         // 判断是否是预期 @match 的 URL
-        if (checkUrlMatch()) {
-            triggerButton.create();
+        if (doesUrlMatch) {
+            const isChat = (await request.getAppType()) === 'Chat';
+            if (isChat) {
+                triggerButton.create();
+            }
         } else {
             // 如果不是则隐藏触发按钮 (already handled by cleanup)
         }
