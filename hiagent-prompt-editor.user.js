@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         HiAgent Prompt 编辑器
 // @namespace    http://tampermonkey.net/
-// @version      2026-02-11
+// @version      2026-02-12
 // @description  try to take over the world!
 // @author       libook
 // @match        https://hia.volcenginepaas.com/product/llm/personal/personal-*/application*
