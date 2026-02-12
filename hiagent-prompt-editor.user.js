@@ -13,6 +13,8 @@
     'use strict';
 
     const AUTO_SAVE_DURATION = 1000;//1秒
+    const AUTO_SAVE_DB_DURATION = 60 * 1000; // 1分钟
+    let autoSaveIntervalId;
 
     let personal = '';
     let application = '';
@@ -122,6 +124,113 @@
             }
             return aKeys;
         },
+    };
+
+    const dbAdapter = {
+        dbName: 'HiAgentPromptEditorDB',
+        storeName: 'snapshots',
+        maxRecords: 30,
+
+        async getDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(this.dbName, 1);
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(this.storeName)) {
+                        const store = db.createObjectStore(this.storeName, { keyPath: 'id', autoIncrement: true });
+                        store.createIndex('timestamp', 'timestamp', { unique: false });
+                    }
+                };
+                request.onsuccess = (event) => resolve(event.target.result);
+                request.onerror = (event) => reject(event.target.error);
+            });
+        },
+
+        async getLastRecord() {
+            const db = await this.getDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([this.storeName], 'readonly');
+                const store = transaction.objectStore(this.storeName);
+                const index = store.index('timestamp');
+                const request = index.openCursor(null, 'prev'); // Get latest
+
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        resolve(cursor.value);
+                    } else {
+                        resolve(null);
+                    }
+                };
+                request.onerror = (event) => reject(event.target.error);
+            });
+        },
+
+        async addRecord(content) {
+            const db = await this.getDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([this.storeName], 'readwrite');
+                const store = transaction.objectStore(this.storeName);
+                const request = store.add({
+                    content: content,
+                    timestamp: new Date().getTime()
+                });
+
+                request.onsuccess = () => resolve();
+                request.onerror = (event) => reject(event.target.error);
+            });
+        },
+
+        async pruneRecords() {
+            const db = await this.getDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([this.storeName], 'readwrite');
+                const store = transaction.objectStore(this.storeName);
+                const countRequest = store.count();
+
+                countRequest.onsuccess = () => {
+                    if (countRequest.result > this.maxRecords) {
+                        const index = store.index('timestamp');
+                        const deleteRequest = index.openCursor(null, 'next'); // Oldest first
+
+                        let deletedCount = 0;
+                        const toDelete = countRequest.result - this.maxRecords;
+
+                        deleteRequest.onsuccess = (event) => {
+                            const cursor = event.target.result;
+                            if (cursor && deletedCount < toDelete) {
+                                cursor.delete();
+                                deletedCount++;
+                                cursor.continue();
+                            } else {
+                                resolve();
+                            }
+                        };
+                        deleteRequest.onerror = (e) => reject(e.target.error);
+                    } else {
+                        resolve();
+                    }
+                };
+                countRequest.onerror = (e) => reject(e.target.error);
+            });
+        },
+
+        async saveIfChanged(content) {
+            try {
+                const lastRecord = await this.getLastRecord();
+                if (lastRecord && lastRecord.content === content) {
+                    console.log('Content unchanged, skipping save.');
+                    return;
+                }
+
+                await this.addRecord(content);
+                console.log('Saved new snapshot to IndexedDB.');
+
+                await this.pruneRecords();
+            } catch (error) {
+                console.error('IndexedDB Save Error:', error);
+            }
+        }
     };
 
     const generateHeader = () => ({
@@ -578,6 +687,12 @@
         // 初始化目录
         updateTOC();
 
+        // 启动 IndexedDB 自动保存
+        if (autoSaveIntervalId) clearInterval(autoSaveIntervalId);
+        autoSaveIntervalId = setInterval(() => {
+            dbAdapter.saveIfChanged(textarea.value);
+        }, AUTO_SAVE_DB_DURATION);
+
         // 防止文本域内拖动触发窗口拖动
         textarea.addEventListener('mousedown', (e) => {
             e.stopPropagation();
@@ -669,6 +784,7 @@
         }
 
         function closeFloatingTextarea() {
+            if (autoSaveIntervalId) clearInterval(autoSaveIntervalId);
             container.remove();
             localStorage.removeItem('floatingTextareaPosition');
             localStorage.removeItem('floatingTextareaSize');
@@ -783,6 +899,7 @@
     };
 
     const cleanup = () => {
+        if (autoSaveIntervalId) clearInterval(autoSaveIntervalId);
         const textareaContainer = document.getElementById('floating-textarea-container');
         if (textareaContainer) {
             textareaContainer.remove();
