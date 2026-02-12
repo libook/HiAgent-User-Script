@@ -2,9 +2,13 @@ import floatingTextarea from './floatingTextarea/index.js';
 import triggerButton from './triggerButton.js';
 import autosave from './autosave.js';
 import request from './request.js';
+import loadFromCdn from './loadFromCdn.js';
 
 (async () => {
     'use strict';
+
+    loadFromCdn.loadCss('https://unpkg.com/vditor@3.11.2/dist/index.css');
+    await loadFromCdn.loadJs('https://unpkg.com/vditor@3.11.2/dist/index.min.js');
 
     const cleanup = () => {
         autosave.cleanup();
