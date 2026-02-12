@@ -91,6 +91,7 @@ export default {
                 },
                 "mode": "wysiwyg",
                 "value": promptContent,
+                "width": "100%",
             });
 
             // 添加事件监听
