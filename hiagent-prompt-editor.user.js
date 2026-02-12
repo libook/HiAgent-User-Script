@@ -769,6 +769,12 @@
                     existing.style.display = 'none';
                 }
             } else {
+                // 移除原编辑器
+                document.querySelector('div.left-info')?.remove();
+                // 调整编排页面宽度
+                document.querySelector('.right-info').style.setProperty('width', 'auto');
+
+                // 创建浮动文本域
                 await createFloatingTextarea();
             }
         });
