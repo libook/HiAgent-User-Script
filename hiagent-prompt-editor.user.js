@@ -772,7 +772,7 @@
                 // 移除原编辑器
                 document.querySelector('div.left-info')?.remove();
                 // 调整编排页面宽度
-                document.querySelector('.right-info').style.setProperty('width', 'auto');
+                document.querySelector('.right-info').style.setProperty('width', '100%');
 
                 // 创建浮动文本域
                 await createFloatingTextarea();
