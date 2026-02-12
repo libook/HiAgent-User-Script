@@ -129,11 +129,11 @@
     const dbAdapter = {
         dbName: 'HiAgentPromptEditorDB',
         storeName: 'snapshots',
-        maxRecords: 30,
+        maxRecords: 30, // Per application limits
 
         async getDB() {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open(this.dbName, 1);
+                const request = indexedDB.open(this.dbName, 1); // Keep version 1
                 request.onupgradeneeded = (event) => {
                     const db = event.target.result;
                     if (!db.objectStoreNames.contains(this.storeName)) {
@@ -152,14 +152,42 @@
                 const transaction = db.transaction([this.storeName], 'readonly');
                 const store = transaction.objectStore(this.storeName);
                 const index = store.index('timestamp');
-                const request = index.openCursor(null, 'prev'); // Get latest
+                const request = index.openCursor(null, 'prev'); // Latest first
 
                 request.onsuccess = (event) => {
                     const cursor = event.target.result;
                     if (cursor) {
-                        resolve(cursor.value);
+                        if (cursor.value.application === application) {
+                            resolve(cursor.value);
+                        } else {
+                            cursor.continue(); // Filter manually
+                        }
                     } else {
                         resolve(null);
+                    }
+                };
+                request.onerror = (event) => reject(event.target.error);
+            });
+        },
+
+        async getAllRecords() {
+            const db = await this.getDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([this.storeName], 'readonly');
+                const store = transaction.objectStore(this.storeName);
+                const index = store.index('timestamp');
+                const request = index.openCursor(null, 'prev'); // Latest first
+
+                const records = [];
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        if (cursor.value.application === application) {
+                            records.push(cursor.value);
+                        }
+                        cursor.continue();
+                    } else {
+                        resolve(records);
                     }
                 };
                 request.onerror = (event) => reject(event.target.error);
@@ -172,6 +200,7 @@
                 const transaction = db.transaction([this.storeName], 'readwrite');
                 const store = transaction.objectStore(this.storeName);
                 const request = store.add({
+                    application: application, // Isolate by application
                     content: content,
                     timestamp: new Date().getTime()
                 });
@@ -183,36 +212,18 @@
 
         async pruneRecords() {
             const db = await this.getDB();
-            return new Promise((resolve, reject) => {
+            const records = await this.getAllRecords(); // Already filtered for current app
+
+            if (records.length > this.maxRecords) {
                 const transaction = db.transaction([this.storeName], 'readwrite');
                 const store = transaction.objectStore(this.storeName);
-                const countRequest = store.count();
 
-                countRequest.onsuccess = () => {
-                    if (countRequest.result > this.maxRecords) {
-                        const index = store.index('timestamp');
-                        const deleteRequest = index.openCursor(null, 'next'); // Oldest first
-
-                        let deletedCount = 0;
-                        const toDelete = countRequest.result - this.maxRecords;
-
-                        deleteRequest.onsuccess = (event) => {
-                            const cursor = event.target.result;
-                            if (cursor && deletedCount < toDelete) {
-                                cursor.delete();
-                                deletedCount++;
-                                cursor.continue();
-                            } else {
-                                resolve();
-                            }
-                        };
-                        deleteRequest.onerror = (e) => reject(e.target.error);
-                    } else {
-                        resolve();
-                    }
-                };
-                countRequest.onerror = (e) => reject(e.target.error);
-            });
+                // Oldest records are at the end of the filtered list
+                const toDelete = records.slice(this.maxRecords);
+                toDelete.forEach(record => {
+                    store.delete(record.id);
+                });
+            }
         },
 
         async saveIfChanged(content) {
@@ -331,9 +342,14 @@
         const resizeHandle = document.createElement('div');
         resizeHandle.id = 'floating-resize-handle';
 
+        // 历史记录时间轴
+        const timeline = document.createElement('div');
+        timeline.id = 'floating-timeline';
+
         // 组装
         container.appendChild(header);
         container.appendChild(contentWrapper);
+        container.appendChild(timeline);
         container.appendChild(resizeHandle);
         document.body.appendChild(container);
 
@@ -341,7 +357,7 @@
         applyStyles();
 
         // 添加事件监听
-        setupEventListeners(container, header, textarea, resizeHandle, toc);
+        setupEventListeners(container, header, textarea, resizeHandle, toc, timeline);
 
         // 从localStorage恢复状态
         restoreState(container, textarea);
@@ -418,6 +434,68 @@
                 flex: 1;
                 overflow: hidden;
                 position: relative;
+                border-bottom: 1px solid #ddd;
+            }
+
+            #floating-timeline {
+                height: 30px;
+                background: #fcfcfc;
+                display: flex;
+                align-items: center;
+                padding: 0 10px;
+                gap: 15px; /* path points spacing */
+                overflow-x: auto;
+                overflow-y: hidden;
+                white-space: nowrap;
+                position: relative;
+                flex-shrink: 0;
+            }
+            
+            #floating-timeline::-webkit-scrollbar {
+                height: 4px;
+            }
+            #floating-timeline::-webkit-scrollbar-thumb {
+                background: #ddd;
+                border-radius: 2px;
+            }
+
+            .timeline-point {
+                width: 10px;
+                height: 10px;
+                background-color: #ddd;
+                border-radius: 50%;
+                cursor: pointer;
+                position: relative;
+                flex-shrink: 0;
+                transition: background-color 0.2s, transform 0.1s;
+            }
+            
+            .timeline-point:hover {
+                background-color: #4CAF50;
+                transform: scale(1.2);
+            }
+
+            .timeline-point::after {
+                content: attr(data-time);
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #333;
+                color: #fff;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 11px;
+                white-space: nowrap;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.2s;
+                margin-bottom: 5px;
+                z-index: 100;
+            }
+            
+            .timeline-point:hover::after {
+                opacity: 1;
             }
 
             #floating-toc {
@@ -531,7 +609,7 @@
     }
 
     // 设置事件监听
-    function setupEventListeners(container, header, textarea, resizeHandle, toc) {
+    function setupEventListeners(container, header, textarea, resizeHandle, toc, timeline) {
         let isDragging = false;
         let isResizing = false;
         let startX, startY;
@@ -552,6 +630,30 @@
         closeBtn.addEventListener('click', closeFloatingTextarea);
 
         let saveTimer;
+        const performUpload = async (content) => {
+            const statusEl = document.getElementById('floating-status');
+            if (statusEl) statusEl.textContent = '保存中...';
+
+            try {
+                await setPromt(content);
+                if (statusEl) {
+                    const now = new Date();
+                    const timeStr = now.getHours().toString().padStart(2, '0') + ':' +
+                        now.getMinutes().toString().padStart(2, '0') + ':' +
+                        now.getSeconds().toString().padStart(2, '0');
+                    statusEl.textContent = `已保存 ${timeStr}`;
+                    statusEl.style.color = '#4CAF50';
+                    if (typeof renderTimeline === 'function') renderTimeline();
+                }
+            } catch (error) {
+                console.error(error);
+                if (statusEl) {
+                    statusEl.textContent = '保存失败';
+                    statusEl.style.color = 'red';
+                }
+            }
+        };
+
         const saveContent = () => {
             if (saveTimer !== undefined) {
                 clearTimeout(saveTimer);
@@ -561,22 +663,7 @@
             if (statusEl) statusEl.textContent = '保存中...';
 
             saveTimer = setTimeout(() => {
-                setPromt(textarea.value).then(() => {
-                    if (statusEl) {
-                        const now = new Date();
-                        const timeStr = now.getHours().toString().padStart(2, '0') + ':' +
-                            now.getMinutes().toString().padStart(2, '0') + ':' +
-                            now.getSeconds().toString().padStart(2, '0');
-                        statusEl.textContent = `已保存 ${timeStr}`;
-                        statusEl.style.color = '#4CAF50';
-                    }
-                }).catch(error => {
-                    console.error(error);
-                    if (statusEl) {
-                        statusEl.textContent = '保存失败';
-                        statusEl.style.color = 'red';
-                    }
-                });
+                performUpload(textarea.value);
             }, AUTO_SAVE_DURATION);
         };
 
@@ -688,10 +775,58 @@
         updateTOC();
 
         // 启动 IndexedDB 自动保存
-        if (autoSaveIntervalId) clearInterval(autoSaveIntervalId);
-        autoSaveIntervalId = setInterval(() => {
-            dbAdapter.saveIfChanged(textarea.value);
-        }, AUTO_SAVE_DB_DURATION);
+        const startAutoSave = () => {
+            if (autoSaveIntervalId) clearInterval(autoSaveIntervalId);
+            autoSaveIntervalId = setInterval(async () => {
+                await dbAdapter.saveIfChanged(textarea.value);
+                renderTimeline();
+            }, AUTO_SAVE_DB_DURATION);
+        };
+        startAutoSave();
+
+        // 渲染时间轴
+        const renderTimeline = async () => {
+            const records = await dbAdapter.getAllRecords();
+            timeline.innerHTML = '';
+
+            // Draw line
+            // We use flex gap for spacing, but maybe a visual line background helps?
+            // For now, points are just spaced out.
+
+            records.forEach(record => {
+                const date = new Date(record.timestamp);
+                const timeStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+
+                const point = document.createElement('div');
+                point.className = 'timeline-point';
+                point.dataset.time = timeStr;
+                point.title = `点击恢复到: ${timeStr}`;
+
+                point.addEventListener('click', async () => {
+                    if (confirm(`确认恢复到 ${timeStr} 的版本吗？\n当前未保存的内容将尝试先保存。`)) {
+                        // 1. Try to save current state first
+                        await dbAdapter.saveIfChanged(textarea.value);
+
+                        // 2. Restore
+                        textarea.value = record.content;
+
+                        // 3. Update UI
+                        updateTOC();
+                        renderTimeline(); // Refresh to show the just-saved current state as the latest point
+
+                        // 4. Trigger upload to server immediately
+                        performUpload(textarea.value);
+
+                        alert('已恢复并触发云端保存。');
+                    }
+                });
+
+                timeline.appendChild(point);
+            });
+        };
+
+        // Initial render
+        renderTimeline();
 
         // 防止文本域内拖动触发窗口拖动
         textarea.addEventListener('mousedown', (e) => {
@@ -700,6 +835,11 @@
 
         // 防止TOC内拖动触发窗口拖动
         toc.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+
+        // 防止Timeline内拖动触发窗口拖动
+        timeline.addEventListener('mousedown', (e) => {
             e.stopPropagation();
         });
 
