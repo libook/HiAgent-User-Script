@@ -90,9 +90,6 @@ export default {
                     box?.input(text);
                 },
                 "mode": "wysiwyg",
-                "outline": {
-                    "enable": true,
-                },
                 "value": promptContent,
                 "width": "100%",
             });
