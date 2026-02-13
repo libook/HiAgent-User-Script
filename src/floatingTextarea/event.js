@@ -282,9 +282,6 @@ export default (container, header, textarea, resizeHandle, toc, timeline) => {
     // 初始化目录
     updateTOC();
 
-    // 启动 IndexedDB 自动保存
-    autosave.start(textarea.value);
-
     // 渲染时间轴
     const renderTimeline = async () => {
         const records = await dbAdapter.getAllRecords();
@@ -325,6 +322,9 @@ export default (container, header, textarea, resizeHandle, toc, timeline) => {
             timeline.appendChild(point);
         });
     };
+
+    // 启动 IndexedDB 自动保存
+    autosave.start(textarea, renderTimeline);
 
     // Initial render
     renderTimeline();
