@@ -35,6 +35,7 @@ export default {
 // @match        https://hia.volcenginepaas.com/product/llm/personal/personal-*/application*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=volcenginepaas.com
 // @grant        none
+// @require      https://cdn.jsdelivr.net/npm/diff@5.2.0/dist/diff.min.js
 // ==/UserScript==
         `.trim()
     },

@@ -282,8 +282,16 @@ export default (container, header, textarea, resizeHandle, toc, timeline) => {
     // 初始化目录
     updateTOC();
 
+    let tooltip = null;
+
     // 渲染时间轴
     const renderTimeline = async () => {
+        // Cleanup existing tooltip on re-render
+        if (tooltip) {
+            tooltip.remove();
+            tooltip = null;
+        }
+
         const records = await dbAdapter.getAllRecords();
         timeline.innerHTML = '';
 
@@ -298,7 +306,70 @@ export default (container, header, textarea, resizeHandle, toc, timeline) => {
             const point = document.createElement('div');
             point.className = 'timeline-point';
             point.dataset.time = timeStr;
-            point.title = `点击恢复到: ${timeStr}`;
+            // point.title = `点击恢复到: ${timeStr}`; // Removing native title to use custom tooltip
+
+            /* global Diff */
+            point.addEventListener('mouseenter', () => {
+                if (tooltip) tooltip.remove();
+
+                const currentContent = textarea.value;
+                const recordContent = record.content;
+
+                // @ts-ignore
+                if (typeof Diff === 'undefined') {
+                    console.warn('Diff library not loaded');
+                    return;
+                }
+
+                // 使用 jsdiff 生成 patch
+                // @ts-ignore
+                const patch = Diff.createTwoFilesPatch('Current', 'Backup', currentContent, recordContent, 'Current', timeStr);
+
+                tooltip = document.createElement('div');
+                tooltip.className = 'diff-tooltip';
+
+                // 简单的语法高亮
+                const html = patch.split('\n').map(line => {
+                    let className = 'diff-line';
+                    if (line.startsWith('+')) className += ' diff-added';
+                    else if (line.startsWith('-')) className += ' diff-removed';
+                    else if (line.startsWith('@')) className += ' diff-header';
+                    return `<div class="${className}">${line}</div>`;
+                }).join('');
+
+                tooltip.innerHTML = html;
+                document.body.appendChild(tooltip);
+
+                // Position tooltip
+                const rect = point.getBoundingClientRect();
+                const tooltipWidth = tooltip.offsetWidth;
+                let left = rect.left;
+
+                // Prevent overflow right
+                const PADDING = 20;
+                if (left + tooltipWidth > window.innerWidth - PADDING) {
+                    left = window.innerWidth - tooltipWidth - PADDING;
+                }
+                // Prevent overflow left (just in case)
+                if (left < PADDING) {
+                    left = PADDING;
+                }
+
+                tooltip.style.left = `${left}px`;
+                const TOOLTIP_VERTICAL_OFFSET = 10;
+                tooltip.style.bottom = `${window.innerHeight - rect.top + TOOLTIP_VERTICAL_OFFSET}px`; // Show above the point
+            });
+
+            point.addEventListener('mouseleave', (e) => {
+                // Check if moving to tooltip
+                if (e.relatedTarget && tooltip && tooltip.contains(e.relatedTarget)) {
+                    return;
+                }
+                if (tooltip) {
+                    tooltip.remove();
+                    tooltip = null;
+                }
+            });
 
             point.addEventListener('click', async () => {
                 if (confirm(`确认恢复到 ${timeStr} 的版本吗？\n当前未保存的内容将尝试先保存。`)) {

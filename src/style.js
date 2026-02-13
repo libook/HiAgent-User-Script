@@ -237,6 +237,46 @@ export default () => {
         #floating-textarea-container.resizing {
             pointer-events: none;
         }
+
+        .diff-tooltip {
+            position: fixed;
+            background: rgba(30, 30, 30, 0.95);
+            color: #d4d4d4;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 8px;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            z-index: 1000000;
+            white-space: pre;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            max-width: 600px;
+            max-height: 400px;
+            overflow: auto;
+            line-height: 1.4;
+        }
+
+        .diff-line {
+            display: block;
+        }
+
+        .diff-added {
+            background-color: rgba(46, 160, 67, 0.3);
+            color: #b7f0ba;
+        }
+
+        .diff-removed {
+            background-color: rgba(248, 81, 73, 0.3);
+            color: #ffb1af;
+        }
+
+        .diff-header {
+            color: #8b949e;
+            border-bottom: 1px solid #444;
+            margin-bottom: 4px;
+            padding-bottom: 4px;
+        }
     `;
     document.head.appendChild(style);
 };
