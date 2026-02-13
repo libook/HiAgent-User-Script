@@ -4,7 +4,6 @@ import event from './event.js';
 import state from './state.js';
 
 const CONTAINER_ID = 'floating-textarea-container';
-let vditor = null;
 
 export default {
     "cleanup": () => {
@@ -12,8 +11,6 @@ export default {
         if (textareaContainer) {
             textareaContainer.remove();
         }
-        vditor?.destroy();
-        vditor = null;
     },
     "create": async function () {
         if (!this.doesExist) {
@@ -40,14 +37,18 @@ export default {
                 </div>
             `;
 
-            // 编辑器区域
-            const vditorElement = document.createElement('div');
-            vditorElement.id = 'vditor';
+            // 文本域
+            const textarea = document.createElement('textarea');
+            textarea.id = 'floating-textarea';
+            textarea.placeholder = '在这里输入内容...';
 
-            let promptContent;
+            // 目录区域
+            const toc = document.createElement('div');
+            toc.id = 'floating-toc';
 
             try {
-                promptContent = await request.getPrompt();
+                const promptContent = await request.getPrompt();
+                textarea.value = promptContent || '';
             } catch (e) {
                 console.error('Failed to load prompt:', e);
                 alert('内容加载失败');
@@ -57,7 +58,8 @@ export default {
             // 内容包装器
             const contentWrapper = document.createElement('div');
             contentWrapper.id = 'floating-content-wrapper';
-            contentWrapper.appendChild(vditorElement);
+            contentWrapper.appendChild(toc);
+            contentWrapper.appendChild(textarea);
 
             // 调整大小手柄
             const resizeHandle = document.createElement('div');
@@ -77,27 +79,11 @@ export default {
             // 应用样式
             style();
 
-            // 一个对象盒子
-            const box = {};
-
-            // 初始化编辑器
-            vditor = new Vditor('vditor', { // eslint-disable-line no-undef
-                "cache": {
-                    "enable": false,
-                },
-                "customWysiwygToolbar": () => { },
-                input(text) {
-                    box?.input(text);
-                },
-                "mode": "wysiwyg",
-                "value": promptContent,
-            });
-
             // 添加事件监听
-            event(container, header, vditor, box, resizeHandle, timeline);
+            event(container, header, textarea, resizeHandle, toc, timeline);
 
             // 从localStorage恢复状态
-            state.restore(container);
+            state.restore(container, textarea);
 
             return container;
         } else {
