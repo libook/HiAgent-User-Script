@@ -1,10 +1,20 @@
 import {nodeResolve} from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 
+const version = new Date().toISOString().
+    replace(
+        /:/g,
+        "_"
+    ).
+    replace(
+        /\..*/,
+        ""
+    );
+
 export default {
     "input": "src/index.js", // 你的入口文件
     "output": {
-        "file": "dist/hiagent-prompt-editor.user.js", // 输出单文件
+        "file": `dist/hiagent-prompt-editor.user-v${version}.js`, // 输出单文件
         "format": "esm", // 输出格式，可选 'esm', 'cjs', 'iife' 等
 
         // --- 核心配置：非压缩、非混淆 ---
@@ -19,7 +29,7 @@ export default {
 // ==UserScript==
 // @name         HiAgent Prompt 编辑器
 // @namespace    http://tampermonkey.net/
-// @version      ${new Date().toISOString()}
+// @version      ${version}
 // @description  try to take over the world!
 // @author       libook
 // @match        https://hia.volcenginepaas.com/product/llm/personal/personal-*/application*
