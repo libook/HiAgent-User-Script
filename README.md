@@ -1,8 +1,8 @@
 
 
-# Hi Agent User Script
+# HiAgent User Script
 
-一个功能强大的浏览器用户脚本，为网页交互提供增强功能。
+用于优化 HiAgent 界面体验的油猴脚本。
 
 ## 功能特性
 

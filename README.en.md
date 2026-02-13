@@ -1,6 +1,6 @@
 # Hi Agent User Script
 
-A powerful browser userscript that enhances web interaction functionality.
+A userscript that enhances HiAgent interaction functionality.
 
 ## Features
 
